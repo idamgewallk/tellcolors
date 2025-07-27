@@ -25,8 +25,20 @@
       margin-top: 1rem;
       font-size: 1.2rem;
     }
+    #stats {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #f0f0f0;
+      border-radius: 5px;
+    }
     label, input {
       margin: 0.5rem;
+    }
+    .correct {
+      color: green;
+    }
+    .incorrect {
+      color: red;
     }
   </style>
 </head>
@@ -37,14 +49,63 @@
   <div id="color-boxes"></div>
   <button onclick="startGame()">Start</button>
   <div id="spoken-result"></div>
+  <div id="stats">
+    <h3>Statistics</h3>
+    <p>Correct: <span id="correct-count">0</span></p>
+    <p>Incorrect: <span id="incorrect-count">0</span></p>
+    <p>Accuracy: <span id="accuracy">0%</span></p>
+  </div>
 
   <script>
-    const colors = ["red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray"];
+    // Expanded color list with variations
+    const colors = [
+      // Reds
+      "red", "darkred", "firebrick", "crimson", "tomato", "indianred", "lightcoral",
+      // Greens
+      "green", "darkgreen", "forestgreen", "lime", "limegreen", "seagreen", "mediumseagreen",
+      "springgreen", "olivedrab", "darkolivegreen", "yellowgreen", "lawngreen", "lightgreen",
+      "palegreen", "mediumspringgreen",
+      // Blues
+      "blue", "darkblue", "mediumblue", "navy", "midnightblue", "royalblue", "cornflowerblue",
+      "dodgerblue", "deepskyblue", "lightblue", "skyblue", "steelblue", "lightsteelblue",
+      // Yellows/Oranges
+      "yellow", "gold", "lightyellow", "lemonchiffon", "orange", "darkorange", "coral",
+      // Purples
+      "purple", "darkmagenta", "mediumpurple", "blueviolet", "darkviolet", "mediumorchid",
+      "orchid", "violet", "plum", "thistle",
+      // Others
+      "pink", "brown", "black", "white", "gray", "silver", "aqua", "turquoise", "teal"
+    ];
+    
+    // Color groups for flexible matching
+    const colorGroups = {
+      "red": ["red", "darkred", "firebrick", "crimson", "tomato", "indianred", "lightcoral"],
+      "green": ["green", "darkgreen", "forestgreen", "seagreen", "darkolivegreen", "olivedrab"],
+      "light green": ["lime", "limegreen", "mediumseagreen", "springgreen", "yellowgreen", 
+                     "lawngreen", "lightgreen", "palegreen", "mediumspringgreen"],
+      "blue": ["blue", "darkblue", "mediumblue", "navy", "midnightblue", "royalblue"],
+      "light blue": ["cornflowerblue", "dodgerblue", "deepskyblue", "lightblue", "skyblue", 
+                    "steelblue", "lightsteelblue"],
+      "yellow": ["yellow", "gold", "lightyellow", "lemonchiffon"],
+      "orange": ["orange", "darkorange", "coral"],
+      "purple": ["purple", "darkmagenta", "mediumpurple", "blueviolet", "darkviolet"],
+      "light purple": ["mediumorchid", "orchid", "violet", "plum", "thistle"],
+      "pink": ["pink"],
+      "brown": ["brown"],
+      "black": ["black"],
+      "white": ["white"],
+      "gray": ["gray", "silver"],
+      "aqua": ["aqua", "turquoise", "teal"]
+    };
+    
     let currentColors = [];
     let intervalId;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let totalAttempts = 0;
 
     function getRandomColors(count = 3) {
-      const shuffled = colors.sort(() => 0.5 - Math.random());
+      const shuffled = [...colors].sort(() => 0.5 - Math.random());
       return shuffled.slice(0, count);
     }
 
@@ -64,10 +125,25 @@
     }
 
     function startGame() {
+      // Reset statistics
+      correctCount = 0;
+      incorrectCount = 0;
+      totalAttempts = 0;
+      updateStats();
+      
       clearInterval(intervalId);
       const seconds = Math.max(1, Math.min(10, parseInt(document.getElementById("interval").value)));
       showColors();
       intervalId = setInterval(showColors, seconds * 1000);
+    }
+
+    function findMatchingColorGroup(spokenColor) {
+      for (const [groupName, groupColors] of Object.entries(colorGroups)) {
+        if (groupColors.some(color => spokenColor.includes(color))) {
+          return groupName;
+        }
+      }
+      return null;
     }
 
     function startSpeechRecognition() {
@@ -78,9 +154,47 @@
 
       recognition.onresult = (event) => {
         const spoken = event.results[0][0].transcript.toLowerCase();
-        const matchedColors = currentColors.filter(color => spoken.includes(color));
-        const resultText = `You said: "${spoken}"<br>Matched: ${matchedColors.join(", ")}`;
-        document.getElementById("spoken-result").innerHTML = resultText;
+        let matchedColors = [];
+        let correctMatches = 0;
+        
+        // Check for both exact matches and group matches
+        currentColors.forEach(color => {
+          // Try to find the base color group
+          let foundGroup = null;
+          for (const [groupName, groupColors] of Object.entries(colorGroups)) {
+            if (groupColors.includes(color)) {
+              foundGroup = groupName;
+              break;
+            }
+          }
+          
+          // Check if spoken text matches either the exact color or its group
+          if (spoken.includes(color) || 
+              (foundGroup && spoken.includes(foundGroup))) {
+            matchedColors.push(color);
+            correctMatches++;
+          }
+        });
+        
+        // Update statistics
+        totalAttempts += currentColors.length;
+        correctCount += correctMatches;
+        incorrectCount += (currentColors.length - correctMatches);
+        updateStats();
+        
+        // Display results with color coding
+        const resultDiv = document.getElementById("spoken-result");
+        resultDiv.innerHTML = `You said: "${spoken}"<br>`;
+        
+        if (matchedColors.length > 0) {
+          resultDiv.innerHTML += `<span class="correct">Correct: ${matchedColors.join(", ")}</span><br>`;
+        }
+        
+        // Find colors that weren't matched
+        const unmatchedColors = currentColors.filter(color => !matchedColors.includes(color));
+        if (unmatchedColors.length > 0) {
+          resultDiv.innerHTML += `<span class="incorrect">Missed: ${unmatchedColors.join(", ")}</span>`;
+        }
       };
 
       recognition.onerror = (event) => {
@@ -88,6 +202,16 @@
       };
 
       recognition.start();
+    }
+    
+    function updateStats() {
+      document.getElementById("correct-count").textContent = correctCount;
+      document.getElementById("incorrect-count").textContent = incorrectCount;
+      
+      const accuracy = totalAttempts > 0 
+        ? Math.round((correctCount / totalAttempts) * 100) 
+        : 0;
+      document.getElementById("accuracy").textContent = `${accuracy}%`;
     }
   </script>
 </body>
