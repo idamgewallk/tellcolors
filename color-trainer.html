@@ -2,168 +2,150 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Speech Trainer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Color & Image Retelling</title>
   <style>
     body {
       font-family: sans-serif;
       text-align: center;
-      padding: 2rem;
+      margin: 20px;
     }
-    .section {
-      margin-bottom: 4rem;
+
+    h1 {
+      margin-bottom: 10px;
     }
-    #color-boxes, #object-image {
+
+    .mode-buttons {
+      margin-bottom: 20px;
+    }
+
+    button {
+      margin: 0 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+    }
+
+    #display-box {
+      margin: 20px auto;
+      width: 400px;
+      height: 300px;
+      border: 2px solid #ccc;
       display: flex;
+      align-items: center;
       justify-content: center;
-      gap: 1rem;
-      margin: 1rem auto;
+      font-size: 1.5rem;
+      font-weight: bold;
     }
-    .color-box {
-      width: 100px;
-      height: 100px;
-      border: 2px solid #000;
+
+    #image {
+      max-width: 100%;
+      max-height: 100%;
     }
-    img.object-img {
-      max-width: 300px;
-      height: auto;
-      border: 2px solid #000;
+
+    .stats {
+      margin-top: 10px;
     }
-    .controls {
-      margin-top: 1rem;
-    }
-    .score {
-      font-size: 1.2rem;
-      margin-top: 1rem;
+
+    select {
+      font-size: 1rem;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Speech Trainer App</h1>
 
-  <!-- Mode Switcher -->
-  <div class="controls">
-    <button onclick="setMode('colors')">🟦 Color Retelling</button>
-    <button onclick="setMode('objects')">🟩 Object Recognition</button>
-    <br>
-    <label for="interval">Display Time (1–10 seconds):</label>
-    <input type="number" id="interval" value="3" min="1" max="10" /> seconds
+  <h1>Color & Image Retelling Practice</h1>
+
+  <div class="mode-buttons">
+    <button onclick="startColorRetelling()">Color Retelling</button>
+    <button onclick="startImageRetelling()">Image Retelling</button>
   </div>
 
-  <!-- COLOR MODE -->
-  <div id="color-section" class="section" style="display: none;">
-    <h2>🎨 Color Retelling</h2>
-    <div id="color-boxes"></div>
-    <div id="color-result" class="score"></div>
+  <label for="interval">Select Timer (seconds):</label>
+  <select id="interval" onchange="updateInterval()">
+    <option value="3000">3</option>
+    <option value="5000" selected>5</option>
+    <option value="7000">7</option>
+    <option value="10000">10</option>
+  </select>
+
+  <div id="display-box">
+    <div id="color-box" style="width: 100%; height: 100%;"></div>
+    <img id="image" style="display:none;" />
   </div>
 
-  <!-- OBJECT MODE -->
-  <div id="object-section" class="section" style="display: none;">
-    <h2>🖼️ Object Recognition</h2>
-    <div id="object-image"></div>
-    <div id="object-result" class="score"></div>
-    <div id="object-score" class="score"></div>
+  <div class="stats">
+    <p id="attempts">Correct: 0 | Incorrect: 0</p>
   </div>
 
   <script>
-    const colors = ["red", "blue", "green", "yellow", "orange", "purple", "pink", "brown", "black", "white", "gray"];
-    const objects = [
-      { name: "broom", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Broom.jpg/320px-Broom.jpg" },
-      { name: "soil", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Soil_Sample.jpg/320px-Soil_Sample.jpg" },
-      { name: "pipeline", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Oil_pipeline_in_Minnesota_crop.jpg/320px-Oil_pipeline_in_Minnesota_crop.jpg" },
-      { name: "scale", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Kitchen_scale_1.jpg/320px-Kitchen_scale_1.jpg" },
-      { name: "seeds", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Mixed_seeds.jpg/320px-Mixed_seeds.jpg" },
-      { name: "continent", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Continents_map.png/320px-Continents_map.png" }
+    let selectedTimeInterval = 5000;
+    let imageRetellingActive = false;
+    let currentImageIndex = 0;
+    const maxImages = 20;
+    const imageList = [
+      "broom", "soil", "seed", "pipeline", "globe", "scale", "scissors",
+      "clock", "spoon", "pencil", "candle", "mirror", "cup", "ladder", "keyboard",
+      "monitor", "bottle", "shoes", "glasses", "notebook"
     ];
+    let correct = 0;
+    let incorrect = 0;
 
-    let mode = "colors";
-    let intervalId;
-    let colorCurrent = [];
-    let objectIndex = 0;
-    let objectCorrect = 0;
-    let objectFailed = 0;
-    let objectSet = [];
-
-    function setMode(selectedMode) {
-      mode = selectedMode;
-      clearInterval(intervalId);
-      document.getElementById("color-section").style.display = mode === "colors" ? "block" : "none";
-      document.getElementById("object-section").style.display = mode === "objects" ? "block" : "none";
-      const seconds = Math.max(1, Math.min(10, parseInt(document.getElementById("interval").value)));
-      if (mode === "colors") startColorMode(seconds);
-      if (mode === "objects") startObjectMode(seconds);
+    function updateInterval() {
+      selectedTimeInterval = parseInt(document.getElementById("interval").value);
     }
 
-    // ---------- COLOR MODE ----------
-    function startColorMode(seconds) {
-      showColorBoxes();
-      intervalId = setInterval(showColorBoxes, seconds * 1000);
+    function startColorRetelling() {
+      imageRetellingActive = false;
+      document.getElementById("color-box").style.display = "block";
+      document.getElementById("image").style.display = "none";
+      correct = 0;
+      incorrect = 0;
+      updateStats();
+      nextColor();
     }
 
-    function showColorBoxes() {
-      const container = document.getElementById("color-boxes");
-      container.innerHTML = "";
-      colorCurrent = colors.sort(() => 0.5 - Math.random()).slice(0, 3);
-      colorCurrent.forEach(color => {
-        const box = document.createElement("div");
-        box.className = "color-box";
-        box.style.backgroundColor = color;
-        container.appendChild(box);
-      });
-      startSpeechRecognition(colorCurrent, "color-result");
+    function startImageRetelling() {
+      imageRetellingActive = true;
+      currentImageIndex = 0;
+      document.getElementById("color-box").style.display = "none";
+      document.getElementById("image").style.display = "block";
+      correct = 0;
+      incorrect = 0;
+      updateStats();
+      loadNextImage();
     }
 
-    // ---------- OBJECT MODE ----------
-    function startObjectMode(seconds) {
-      objectSet = objects.sort(() => 0.5 - Math.random()).slice(0, 20);
-      objectIndex = 0;
-      objectCorrect = 0;
-      objectFailed = 0;
-      document.getElementById("object-score").innerText = "";
-      showNextObject(seconds);
+    function updateStats() {
+      document.getElementById("attempts").textContent = `Correct: ${correct} | Incorrect: ${incorrect}`;
     }
 
-    function showNextObject(seconds) {
-      if (objectIndex >= objectSet.length) {
-        alert("20 images done! Page will reload to start again.");
-        location.reload();
+    function nextColor() {
+      if (imageRetellingActive) return;
+
+      const colors = ["red", "blue", "green", "yellow", "purple", "orange", "pink", "brown", "black", "white"];
+      const box = document.getElementById("color-box");
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      box.style.backgroundColor = color;
+      box.textContent = color.toUpperCase();
+
+      setTimeout(() => nextColor(), selectedTimeInterval);
+    }
+
+    function loadNextImage() {
+      if (!imageRetellingActive) return;
+
+      if (currentImageIndex >= maxImages) {
+        setTimeout(() => location.reload(), 3000);
         return;
       }
-      const obj = objectSet[objectIndex];
-      const container = document.getElementById("object-image");
-      container.innerHTML = `<img src="${obj.url}" class="object-img" alt="${obj.name}" />`;
-      startSpeechRecognition([obj.name], "object-result", true);
 
-      setTimeout(() => {
-        objectIndex++;
-        showNextObject(seconds);
-      }, seconds * 1000);
-    }
+      const query = imageList[currentImageIndex % imageList.length];
+      const imgEl = document.getElementById("image");
+      imgEl.src = `https://source.unsplash.com/400x300/?${query}`;
+      currentImageIndex++;
 
-    // ---------- SPEECH ----------
-    function startSpeechRecognition(expectedWords, resultElementId, trackScore = false) {
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onresult = (event) => {
-        const spoken = event.results[0][0].transcript.toLowerCase();
-        const matched = expectedWords.filter(w => spoken.includes(w));
-        document.getElementById(resultElementId).innerHTML = `You said: "${spoken}"<br>Matched: ${matched.join(", ")}`;
-
-        if (trackScore) {
-          if (matched.length > 0) objectCorrect++;
-          else objectFailed++;
-          document.getElementById("object-score").innerText = `✅ Correct: ${objectCorrect} | ❌ Incorrect: ${objectFailed}`;
-        }
-      };
-
-      recognition.onerror = (event) => {
-        document.getElementById(resultElementId).textContent = `Error: ${event.error}`;
-      };
-
-      recognition.start();
+      setTimeout(() => loadNextImage(), selectedTimeInterval);
     }
   </script>
 </body>
